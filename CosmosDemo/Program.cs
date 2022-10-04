@@ -1,10 +1,9 @@
+using CosmosDemo.Enum;
 using CosmosDemo.Repositories;
 using CosmosDemo.Services;
 using Microsoft.Azure.Cosmos.Fluent;
 
-const string databaseName = "DemoDB";
-const string containerName = "NutritionFoods";
-const string partitionKeyPath = "/foodGroup";
+ 
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,7 +12,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<IFoodDataRepository>(
-    InitializeCosmosClientInstanceAsync(builder.Configuration.GetSection("Cosmos"), databaseName, containerName, partitionKeyPath).GetAwaiter().GetResult());
+    InitializeCosmosClientInstanceAsync(builder.Configuration.GetSection("Cosmos"), 
+    CosmosDbValue.DatabaseName, 
+    CosmosDbValue.ContainerName, 
+    CosmosDbValue.PartitionKeyPath)
+    .GetAwaiter().GetResult());
 
 var app = builder.Build();
 
@@ -21,7 +24,10 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(config =>
+    {
+        config.DisplayRequestDuration();
+    });
 }
 
 app.UseHttpsRedirection();

@@ -1,61 +1,61 @@
 ﻿namespace CosmosDemo.Models
 {
-    using Newtonsoft.Json;
+    using System.Text.Json.Serialization;
 
     public class FoodDetail
     {
-        [JsonProperty("id")]
-        public string Id { get; set; }= Guid.NewGuid().ToString();
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = Guid.NewGuid().ToString();
 
-        [JsonProperty("description")]
+        [JsonPropertyName("description")]
         public string Description { get; set; }
 
-        [JsonProperty("tags")]
+        [JsonPropertyName("tags")]
         public List<Tag> Tags { get; set; }
 
-        [JsonProperty("version")]
+        [JsonPropertyName("version")]
         public int Version { get; set; }
 
-        [JsonProperty("foodGroup")]
+        [JsonPropertyName("foodGroup")]
         public string FoodGroup { get; set; }
 
-        [JsonProperty("nutrients")]
+        [JsonPropertyName("nutrients")]
         public List<Nutrient> Nutrients { get; set; }
 
-        [JsonProperty("servings")]
+        [JsonPropertyName("servings")]
         public List<Serving> Servings { get; set; }
     }
 
     public class Nutrient
     {
-        [JsonProperty("id")]
+        [JsonPropertyName("id")]
         public string Id { get; set; }
 
-        [JsonProperty("description")]
+        [JsonPropertyName("description")]
         public string Description { get; set; }
 
-        [JsonProperty("nutritionValue")]
+        [JsonPropertyName("nutritionValue")]
         public double NutritionValue { get; set; }
 
-        [JsonProperty("units")]
+        [JsonPropertyName("units")]
         public string Units { get; set; }
     }
 
     public class Serving
     {
-        [JsonProperty("amount")]
-        public int Amount { get; set; }
+        [JsonPropertyName("amount")]
+        public double Amount { get; set; }
 
-        [JsonProperty("description")]
+        [JsonPropertyName("description")]
         public string Description { get; set; }
 
-        [JsonProperty("weightInGrams")]
+        [JsonPropertyName("weightInGrams")]
         public double WeightInGrams { get; set; }
     }
 
     public class Tag
     {
-        [JsonProperty("name")]
+        [JsonPropertyName("name")]
         public string Name { get; set; }
     }
 }
