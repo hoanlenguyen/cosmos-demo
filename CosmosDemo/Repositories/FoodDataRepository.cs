@@ -18,6 +18,9 @@ namespace CosmosDemo.Repositories
 
         Task DeleteItemAsync(string id, string partitionKey);
         Task UpdatePartialAsync(FoodDetail item);
+
+        Task<PagedResultDto<FoodDetail>> QueryWithContinuationTokens(int rowsPerPage, int skipCount, string partitionKey);
+        Task<PagedResultDto<FoodDetail>> QueryWithOffsetLimit(int rowsPerPage, int skipCount, string partitionKey);
     }
     public class FoodDataRepository : IFoodDataRepository
     {
@@ -103,10 +106,7 @@ namespace CosmosDemo.Repositories
         }
         public async Task UpdatePartialAsync(FoodDetail item)
         {
-            var patchOperations = new List<PatchOperation>();
-            //patchOperations.Add(PatchOperation.Add("/nonExistentParent/Child", "bar"));
-            //patchOperations.Add(PatchOperation.Remove("/cost"));
-            //patchOperations.Add(PatchOperation.Increment("/taskNum", 6));
+            var patchOperations = new List<PatchOperation>();            
             patchOperations.Add(PatchOperation.Set("/description", item.Description));
             stopwatch.Start();
             var response= await container.PatchItemAsync<FoodDetail>(
@@ -117,5 +117,115 @@ namespace CosmosDemo.Repositories
             Console.WriteLine($"Total Request Units consumed: { response.RequestCharge} RUs");
             Console.WriteLine($"Total time: {stopwatch.Elapsed.TotalMilliseconds} ms");
         }
+
+        public async Task<PagedResultDto<FoodDetail>> QueryWithContinuationTokens(int rowsPerPage, int skipCount, string partitionKey)
+        {
+            var result = new PagedResultDto<FoodDetail>();
+
+            var queryCountStr = string.IsNullOrEmpty(partitionKey) ?
+                        $"SELECT COUNT(1) as 'count' FROM c" :
+                        $"SELECT COUNT(1) as 'count' FROM c where c.foodGroup = '{partitionKey}'";
+            var queryCount = container.GetItemQueryIterator<CountResult>(new QueryDefinition(queryCountStr));
+            while (queryCount.HasMoreResults)
+            {
+                var response = await queryCount.ReadNextAsync();
+                var countResult = response.FirstOrDefault();
+                result.TotalItems = countResult?.Count ?? 0;
+            }
+
+
+            var queryStr = string.IsNullOrEmpty(partitionKey) ?
+                        $"SELECT c.id,c.foodGroup,c.description FROM c" :
+                        $"SELECT c.id,c.foodGroup,c.description FROM c where c.foodGroup= '{partitionKey}'";
+
+            QueryDefinition query = new QueryDefinition(queryStr);
+            string continuation = null;
+ 
+            using (FeedIterator<FoodDetail> resultSetIterator = container.GetItemQueryIterator<FoodDetail>(
+                query,
+                requestOptions: new QueryRequestOptions()
+                {
+                    MaxItemCount = rowsPerPage
+                }))
+            {
+                // Execute query and get 1 item in the results. Then, get a continuation token to resume later
+                while (resultSetIterator.HasMoreResults)
+                {
+                    if (skipCount > 0)
+                    {
+                        skipCount--;
+                        continue;
+                    }
+                    FeedResponse<FoodDetail> response = await resultSetIterator.ReadNextAsync();                    
+                    result.Items.AddRange(response);
+                   
+                    // Get continuation token once we've gotten > 0 results. 
+                    if (response.Count > 0)
+                    {
+                        continuation = response.ContinuationToken;
+                        break;
+                    }
+                }
+            }
+
+            // Check if query has already been fully drained
+            if (continuation == null)
+            {
+                return result;
+            }
+
+            //// Resume query using continuation token
+            //using (FeedIterator<FoodDetail> resultSetIterator = container.GetItemQueryIterator<FoodDetail>(
+            //        query,
+            //        requestOptions: new QueryRequestOptions()
+            //        {
+            //            MaxItemCount = rowsPerPage
+            //        },
+            //        continuationToken: continuation))
+            //{
+            //    while (resultSetIterator.HasMoreResults)
+            //    {
+            //        FeedResponse<FoodDetail> response = await resultSetIterator.ReadNextAsync();
+
+            //        result.Items.AddRange(response);                    
+            //    }
+            //}
+            return result;
+        }
+
+        public async Task<PagedResultDto<FoodDetail>> QueryWithOffsetLimit(int rowsPerPage, int skipCount, string partitionKey)
+        {
+            var result = new PagedResultDto<FoodDetail>();
+
+            var queryCountStr = string.IsNullOrEmpty(partitionKey) ?
+                        $"SELECT COUNT(1) as 'count' FROM c" :
+                        $"SELECT COUNT(1) as 'count' FROM c where c.foodGroup = '{partitionKey}'";
+            var queryCount = container.GetItemQueryIterator<CountResult>(new QueryDefinition(queryCountStr));
+            while (queryCount.HasMoreResults)
+            {
+                var response = await queryCount.ReadNextAsync();
+                var countResult = response.FirstOrDefault();
+                result.TotalItems = countResult?.Count??0;
+            }
+
+            var queryStr = string.IsNullOrEmpty(partitionKey) ?
+                        $"SELECT c.id, c.foodGroup, c.description FROM c OFFSET {skipCount} LIMIT {rowsPerPage}" :
+                        $"SELECT c.id,c.foodGroup,c.description FROM c where c.foodGroup= '{partitionKey}' OFFSET {skipCount} LIMIT {rowsPerPage}";
+
+            stopwatch.Start();
+            var query = container.GetItemQueryIterator<FoodDetail>(new QueryDefinition(queryStr));
+            double requestCharge = 0;
+            while (query.HasMoreResults)
+            {
+                var response = await query.ReadNextAsync();
+                result.Items.AddRange(response.ToList());
+                requestCharge += response.RequestCharge;
+            }
+            stopwatch.Stop();
+            Console.WriteLine($"Total Request Units consumed: {requestCharge} RUs");
+            Console.WriteLine($"Total time: {stopwatch.Elapsed.TotalMilliseconds} ms");
+            return result;
+        }
+
     }
 }
